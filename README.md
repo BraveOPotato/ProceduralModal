@@ -1,5 +1,5 @@
 # ProceduralModal
-A web component modal that is procedurally using a JSON config. 
+A web component modal that uses JSON config to procedurally update itself. 
 
 ## How to use:
 Add link to the web component in the HTML like so:
