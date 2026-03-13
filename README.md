@@ -1,6 +1,9 @@
 # ProceduralModal
 A web component modal that uses JSON config to procedurally update itself. 
 
+## What it looks like:
+![Screenshot](https://raw.githubusercontent.com/BraveOPotato/ProceduralModal/refs/heads/main/images/modal.png)
+
 ## How to use:
 Add link to the web component in the HTML like so:
 ```html
