@@ -2,7 +2,10 @@
 A web component modal that uses JSON config to procedurally update itself. 
 
 ## What it looks like:
-![Screenshot](https://raw.githubusercontent.com/BraveOPotato/ProceduralModal/refs/heads/main/images/modal.png)
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/BraveOPotato/ProceduralModal/refs/heads/main/images/modal.png" alt="Screenshot"/>
+</p>
 
 ## How to use:
 Add link to the web component in the HTML like so:
@@ -39,3 +42,13 @@ Finally, add an `onclick` attribute to an HTML element to show the modal in the 
 ```html
 <button onclick="customModal.openModal('add-link')">New</button>
 ```
+
+## Usage:
+THere are two methods that the `RuntimeModal` class provides:
+* `void registerModals([modalObj1, ...])`
+Before you can use the `void openModal(String modalName)` method, at least one modal needs to be registered. As of right now, it isnt' possible to alter a modal after it has been registered, but the user can always add another modal with different parameters and a different name.<br>
+***NOTE***: In the future, either this or another API will be added to alter existing modals at runtime.
+  <br>
+
+* `void openModal(String modalName)`
+Once a modal has been registered with the `void registerModals([modalObj1, ...])`, it will be possible to open it using this method, and the modal object's `modalName` key. 
