@@ -1,5 +1,13 @@
 # ProceduralModal
-A web component modal that uses JSON config to procedurally update itself. 
+A web component modal that uses JSON config to procedurally update itself. <br>
+
+## Features:
+* Draggable window
+* Easy setup of multiple modals
+* Easy setup of mulitple pages per modal
+* Easy to implement into existing codebase
+* Small footprint: 7.6Kb
+* Optional callback on success
 
 ## What it looks like:
 
@@ -12,7 +20,7 @@ Add link to the web component in the HTML like so:
 ```html
 <script src="https://raw.githubusercontent.com/BraveOPotato/ProceduralModal/refs/heads/main/modal-comp.js"></script>
 ```
-Then, in the JavaScript, you can simply define the modals and their configs:
+Then, in the JavaScript, you can simply define the modals and their configs. The following is an example modal:
 
 ```js
 customModal = new RuntimeModal();
@@ -21,7 +29,7 @@ customModal.registerModals([
   {
     modalName: "add-link",
     title: "Add Link",
-    submitUrl: "api.php",
+    submitUrl: "/api.php",
     method: "POST",
     pages: [
       {
