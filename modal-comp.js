@@ -409,11 +409,11 @@ class ProceduralModal extends HTMLElement {
     let response = null;
 
     // Use custom submission handler if defined.
-    if (this.#installerForm.onSubmit) { 
-      response = await this.#installerForm.onSubmit(formDataJson);
+    if (this.#installerConfig.onSubmit) { 
+      response = await this.#installerConfig.onSubmit(this.#installerConfig, formDataJson);
     } else {
-      response = await fetch(this.#installerForm.action, {
-        method: "POST",
+      response = await fetch(this.#installerConfig.action, {
+        method: this.#installerConfig.method || "POST",
         mode: "same-origin",
         headers: {
           "Content-Type": "application/json; charset=UTF-8",
