@@ -412,7 +412,7 @@ class ProceduralModal extends HTMLElement {
     if (this.#installerConfig.onSubmit) { 
       response = await this.#installerConfig.onSubmit(this.#installerConfig, formDataJson);
     } else {
-      response = await fetch(this.#installerConfig.action, {
+      response = await fetch(this.#installerConfig.submitUrl, {
         method: this.#installerConfig.method || "POST",
         mode: "same-origin",
         headers: {
