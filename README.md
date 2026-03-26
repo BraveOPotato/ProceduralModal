@@ -1,4 +1,4 @@
-# ProceduralModal
+# ModalEngine.js
 A web component modal that uses JSON config to procedurally update itself. <br>
 
 ## Features:
