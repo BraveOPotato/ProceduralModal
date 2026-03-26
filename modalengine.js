@@ -207,7 +207,12 @@ class ModalEngine extends HTMLElement {
   // ── Pane field ─────────────────────────────────────────────────────────────
   // Renders a two-column picker: left = selectable items, right = checkboxes.
   // State is stored in this.#formDataStore[field.name] as { itemId: [checkedIds] }.
-  #renderPane(field) {
+  //
+  // options can be: { id, label }[]  — static array
+  //                 async (item) => { id, label }[]  — callback, receives the clicked item
+  // Both field.options and item.options support either form.
+  // Resolved results are cached so a callback is only ever called once per item per open.
+  async #renderPane(field) {
     // Seed state: start from saved formDataStore, fall back to field.checked, fall back to empty.
     const state = this.#formDataStore[field.name]
       ? JSON.parse(this.#formDataStore[field.name])
@@ -218,7 +223,19 @@ class ModalEngine extends HTMLElement {
 
     let selectedItemId = field.items[0]?.id ?? null;
 
-    // ── Outer wrapper (fills the form-group space)
+    // Cache of resolved options per item id — avoids re-fetching on re-click.
+    const optionsCache = {};
+
+    // Resolves the options for a given item, using cache if available.
+    const resolveItemOptions = async (item) => {
+      if (optionsCache[item.id]) return optionsCache[item.id];
+      const raw = item.options ?? field.options ?? [];
+      const resolved = typeof raw === "function" ? await raw(item) : raw;
+      optionsCache[item.id] = resolved;
+      return resolved;
+    };
+
+    // ── Outer wrapper
     const wrapper = document.createElement("div");
     wrapper.style.cssText = "display:flex; flex-direction:column; gap:4px;";
 
@@ -246,11 +263,9 @@ class ModalEngine extends HTMLElement {
     const body = document.createElement("div");
     body.style.cssText = "display:flex; gap:0; border:1px solid #b5b5b5; background:#fff; height:160px;";
 
-    // Left list
-    const leftPanel = document.createElement("div");
+    const leftPanel  = document.createElement("div");
     leftPanel.style.cssText = "flex:0 0 40%; overflow-y:auto; border-right:1px solid #d0d0d0;";
 
-    // Right checklist
     const rightPanel = document.createElement("div");
     rightPanel.style.cssText = "flex:1; overflow-y:auto; padding:6px 8px;";
 
@@ -262,24 +277,31 @@ class ModalEngine extends HTMLElement {
     const syncSentinel = () => { sentinel.value = JSON.stringify(state); };
     syncSentinel();
 
-    // Renders the right panel for the currently selected left item.
-    // Each item can declare its own options list; field.options is the fallback.
-    const renderRight = (itemId) => {
+    // Renders the right panel for the given item. Awaits callback resolution if needed.
+    const renderRight = async (item) => {
       rightPanel.innerHTML = "";
-      const item = field.items.find(i => i.id === itemId);
-      const opts = item?.options ?? field.options ?? [];
+
+      // Show a loading indicator while an async callback resolves.
+      const loading = document.createElement("div");
+      loading.style.cssText = "font-size:12px; color:#888; padding:6px 0;";
+      loading.textContent = "Loading…";
+      rightPanel.appendChild(loading);
+
+      const opts = await resolveItemOptions(item);
+
+      rightPanel.innerHTML = "";
       opts.forEach(opt => {
         const row = document.createElement("label");
         row.style.cssText = "display:flex; align-items:center; gap:6px; font-size:12px; padding:3px 0; cursor:pointer; color:#222;";
         const cb = document.createElement("input");
         cb.type = "checkbox";
         cb.value = opt.id;
-        cb.checked = state[itemId]?.includes(opt.id) ?? false;
+        cb.checked = state[item.id]?.includes(opt.id) ?? false;
         cb.addEventListener("change", () => {
           if (cb.checked) {
-            if (!state[itemId].includes(opt.id)) state[itemId].push(opt.id);
+            if (!state[item.id].includes(opt.id)) state[item.id].push(opt.id);
           } else {
-            state[itemId] = state[itemId].filter(id => id !== opt.id);
+            state[item.id] = state[item.id].filter(id => id !== opt.id);
           }
           syncSentinel();
         });
@@ -288,7 +310,8 @@ class ModalEngine extends HTMLElement {
       });
     };
 
-    // Renders all left-panel rows, highlighting the active one
+    // Renders all left-panel rows, highlighting the active one.
+    // Click handler is async to support awaiting renderRight.
     const renderLeft = () => {
       leftPanel.innerHTML = "";
       field.items.forEach(item => {
@@ -298,17 +321,18 @@ class ModalEngine extends HTMLElement {
           background:${isActive ? "#cce4f7" : "transparent"};
           border-left:3px solid ${isActive ? "#0078d7" : "transparent"};`;
         row.textContent = item.label;
-        row.addEventListener("click", () => {
+        row.addEventListener("click", async () => {
           selectedItemId = item.id;
           renderLeft();
-          renderRight(item.id);
+          await renderRight(item);
         });
         leftPanel.appendChild(row);
       });
     };
 
     renderLeft();
-    if (selectedItemId) renderRight(selectedItemId);
+    const firstItem = field.items.find(i => i.id === selectedItemId);
+    if (firstItem) await renderRight(firstItem);
 
     body.append(leftPanel, rightPanel);
     wrapper.append(body, sentinel);

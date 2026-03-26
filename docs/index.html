@@ -715,8 +715,8 @@
           <tr><td>options</td><td>string[] | object | function</td><td>Required for <code>select</code>. See <a href="#dynamic-options" style="color:var(--accent)">Dynamic Options</a> below for all accepted shapes.</td></tr>
           <tr><td>src</td><td>string</td><td>Image URL. Required for <code>image</code> type.</td></tr>
           <tr><td>alt</td><td>string</td><td>Alt text for <code>image</code> type.</td></tr>
-          <tr><td>items</td><td>{ id, label, options? }[]</td><td>Left-panel list entries. Required for <code>pane</code>. Each item may carry its own <code>options</code> array that overrides the field-level default.</td></tr>
-          <tr><td>options</td><td>varies</td><td>For <code>select</code>: string array, <code>{ label: value }</code> object, or async function. For <code>pane</code>: <code>{ id, label }[]</code> default right-panel entries, used for any item that doesn't declare its own <code>options</code>.</td></tr>
+          <tr><td>items</td><td>{ id, label, options? }[]</td><td>Left-panel list entries. Required for <code>pane</code>. Each item may carry its own <code>options</code> — either a static array or an async callback — that overrides the field-level default.</td></tr>
+          <tr><td>options</td><td>varies</td><td>For <code>select</code>: string array, <code>{ label: value }</code> object, or async function. For <code>pane</code>: <code>{ id, label }[]</code> or <code>async (item) =&gt; { id, label }[]</code> — used as the default for any item that doesn't declare its own <code>options</code>.</td></tr>
           <tr><td>checked</td><td>{ [itemId]: id[] }</td><td>Initial checked state for <code>pane</code>. Keys are item ids; values are arrays of pre-checked option ids.</td></tr>
           <tr><td>leftLabel</td><td>string</td><td>Column header for the left panel. Defaults to <code>"Items"</code>.</td></tr>
           <tr><td>rightLabel</td><td>string</td><td>Column header for the right panel. Defaults to <code>"Options"</code>.</td></tr>
@@ -804,7 +804,9 @@
       <hr class="section-divider"/>
       <p>The <code>pane</code> field type renders a split-panel picker inside the modal body. The left panel lists selectable <strong>items</strong>; clicking one populates the right panel with <strong>checkboxes</strong> whose state is tracked independently per item.</p>
 
-      <p>Each left-panel item can declare its own <code>options</code> array, so different items can expose completely different — or partially overlapping — right-panel choices. A field-level <code>options</code> array serves as the default for items that don't specify their own.</p>
+      <p>Each left-panel item can declare its own <code>options</code>, so different items can expose completely different — or partially overlapping — right-panel choices. A field-level <code>options</code> serves as the default for items that don't specify their own.</p>
+
+      <p>Both <code>field.options</code> and <code>item.options</code> accept either a static <code>{ id, label }[]</code> array or an <code>async (item) =&gt; { id, label }[]</code> callback. Callbacks receive the clicked item object as their argument and are called lazily — only when that item is first selected — and the result is cached so it is never fetched twice in the same modal session.</p>
 
       <p>On submission, the payload contains a JSON-serialised object mapping every item id to the array of checked option ids — including items the user never clicked (they receive an empty array).</p>
 
@@ -839,6 +841,40 @@
     <span class="str">"db-01"</span>:  [<span class="str">"carol"</span>]
   }
 }</code></pre>
+      </div>
+
+      <h3>Callback options</h3>
+      <p>Pass an async function anywhere <code>options</code> is accepted. It receives the item that was clicked and must return a <code>{ id, label }[]</code> array.</p>
+      <div class="code-wrap">
+        <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        <pre><code>{
+  <span class="key">type</span>: <span class="str">"pane"</span>,
+  <span class="key">name</span>: <span class="str">"hostAccess"</span>,
+  <span class="key">leftLabel</span>: <span class="str">"Hosts"</span>, <span class="key">rightLabel</span>: <span class="str">"Users"</span>,
+
+  <span class="cmt">// Field-level callback: fetches users for any item without its own options.</span>
+  <span class="key">options</span>: <span class="kw">async</span> (<span class="obj">item</span>) => {
+    <span class="kw">const</span> <span class="obj">res</span> = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">`/api/users?hostId=<span class="obj">${</span><span class="obj">item</span>.<span class="key">id</span><span class="obj">}</span>`</span>);
+    <span class="kw">return</span> (<span class="kw">await</span> <span class="obj">res</span>.<span class="fn">json</span>()).<span class="fn">map</span>(<span class="obj">u</span> => ({ <span class="key">id</span>: <span class="obj">u</span>.<span class="key">id</span>, <span class="key">label</span>: <span class="obj">u</span>.<span class="key">name</span> }));
+  },
+
+  <span class="key">items</span>: [
+    { <span class="key">id</span>: <span class="str">"web-01"</span>, <span class="key">label</span>: <span class="str">"web-01.prod"</span> },  <span class="cmt">// uses field-level callback</span>
+    {
+      <span class="key">id</span>: <span class="str">"db-01"</span>, <span class="key">label</span>: <span class="str">"db-01.prod"</span>,
+      <span class="cmt">// Item-level callback: fetches only DB admins for this host.</span>
+      <span class="key">options</span>: <span class="kw">async</span> (<span class="obj">item</span>) => {
+        <span class="kw">const</span> <span class="obj">res</span> = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">`/api/db-admins?hostId=<span class="obj">${</span><span class="obj">item</span>.<span class="key">id</span><span class="obj">}</span>`</span>);
+        <span class="kw">return</span> <span class="kw">await</span> <span class="obj">res</span>.<span class="fn">json</span>();
+      }
+    }
+  ]
+}</code></pre>
+      </div>
+
+      <div class="callout success">
+        <div class="callout-title">✓ Lazy + cached</div>
+        <p>Callbacks are invoked only when the user first clicks that item — not upfront. The resolved list is cached for the session, so switching back to a previously-visited item never triggers a second fetch.</p>
       </div>
 
       <h3>Submitted payload</h3>
@@ -1299,7 +1335,12 @@ class ModalEngine extends HTMLElement {
   // ── Pane field ─────────────────────────────────────────────────────────────
   // Renders a two-column picker: left = selectable items, right = checkboxes.
   // State is stored in this.#formDataStore[field.name] as { itemId: [checkedIds] }.
-  #renderPane(field) {
+  //
+  // options can be: { id, label }[]  — static array
+  //                 async (item) => { id, label }[]  — callback, receives the clicked item
+  // Both field.options and item.options support either form.
+  // Resolved results are cached so a callback is only ever called once per item per open.
+  async #renderPane(field) {
     // Seed state: start from saved formDataStore, fall back to field.checked, fall back to empty.
     const state = this.#formDataStore[field.name]
       ? JSON.parse(this.#formDataStore[field.name])
@@ -1310,7 +1351,19 @@ class ModalEngine extends HTMLElement {
 
     let selectedItemId = field.items[0]?.id ?? null;
 
-    // ── Outer wrapper (fills the form-group space)
+    // Cache of resolved options per item id — avoids re-fetching on re-click.
+    const optionsCache = {};
+
+    // Resolves the options for a given item, using cache if available.
+    const resolveItemOptions = async (item) => {
+      if (optionsCache[item.id]) return optionsCache[item.id];
+      const raw = item.options ?? field.options ?? [];
+      const resolved = typeof raw === "function" ? await raw(item) : raw;
+      optionsCache[item.id] = resolved;
+      return resolved;
+    };
+
+    // ── Outer wrapper
     const wrapper = document.createElement("div");
     wrapper.style.cssText = "display:flex; flex-direction:column; gap:4px;";
 
@@ -1338,11 +1391,9 @@ class ModalEngine extends HTMLElement {
     const body = document.createElement("div");
     body.style.cssText = "display:flex; gap:0; border:1px solid #b5b5b5; background:#fff; height:160px;";
 
-    // Left list
-    const leftPanel = document.createElement("div");
+    const leftPanel  = document.createElement("div");
     leftPanel.style.cssText = "flex:0 0 40%; overflow-y:auto; border-right:1px solid #d0d0d0;";
 
-    // Right checklist
     const rightPanel = document.createElement("div");
     rightPanel.style.cssText = "flex:1; overflow-y:auto; padding:6px 8px;";
 
@@ -1354,24 +1405,31 @@ class ModalEngine extends HTMLElement {
     const syncSentinel = () => { sentinel.value = JSON.stringify(state); };
     syncSentinel();
 
-    // Renders the right panel for the currently selected left item.
-    // Each item can declare its own options list; field.options is the fallback.
-    const renderRight = (itemId) => {
+    // Renders the right panel for the given item. Awaits callback resolution if needed.
+    const renderRight = async (item) => {
       rightPanel.innerHTML = "";
-      const item = field.items.find(i => i.id === itemId);
-      const opts = item?.options ?? field.options ?? [];
+
+      // Show a loading indicator while an async callback resolves.
+      const loading = document.createElement("div");
+      loading.style.cssText = "font-size:12px; color:#888; padding:6px 0;";
+      loading.textContent = "Loading…";
+      rightPanel.appendChild(loading);
+
+      const opts = await resolveItemOptions(item);
+
+      rightPanel.innerHTML = "";
       opts.forEach(opt => {
         const row = document.createElement("label");
         row.style.cssText = "display:flex; align-items:center; gap:6px; font-size:12px; padding:3px 0; cursor:pointer; color:#222;";
         const cb = document.createElement("input");
         cb.type = "checkbox";
         cb.value = opt.id;
-        cb.checked = state[itemId]?.includes(opt.id) ?? false;
+        cb.checked = state[item.id]?.includes(opt.id) ?? false;
         cb.addEventListener("change", () => {
           if (cb.checked) {
-            if (!state[itemId].includes(opt.id)) state[itemId].push(opt.id);
+            if (!state[item.id].includes(opt.id)) state[item.id].push(opt.id);
           } else {
-            state[itemId] = state[itemId].filter(id => id !== opt.id);
+            state[item.id] = state[item.id].filter(id => id !== opt.id);
           }
           syncSentinel();
         });
@@ -1380,7 +1438,8 @@ class ModalEngine extends HTMLElement {
       });
     };
 
-    // Renders all left-panel rows, highlighting the active one
+    // Renders all left-panel rows, highlighting the active one.
+    // Click handler is async to support awaiting renderRight.
     const renderLeft = () => {
       leftPanel.innerHTML = "";
       field.items.forEach(item => {
@@ -1390,17 +1449,18 @@ class ModalEngine extends HTMLElement {
           background:${isActive ? "#cce4f7" : "transparent"};
           border-left:3px solid ${isActive ? "#0078d7" : "transparent"};`;
         row.textContent = item.label;
-        row.addEventListener("click", () => {
+        row.addEventListener("click", async () => {
           selectedItemId = item.id;
           renderLeft();
-          renderRight(item.id);
+          await renderRight(item);
         });
         leftPanel.appendChild(row);
       });
     };
 
     renderLeft();
-    if (selectedItemId) renderRight(selectedItemId);
+    const firstItem = field.items.find(i => i.id === selectedItemId);
+    if (firstItem) await renderRight(firstItem);
 
     body.append(leftPanel, rightPanel);
     wrapper.append(body, sentinel);
@@ -1657,27 +1717,39 @@ runtime.registerModals([{
         { id: "db-01",  label: "db-01.prod"  },
         { id: "db-02",  label: "db-02.prod"  }
       ],
-      options: [                        // default: web servers share these users
-        { id: "alice",   label: "Alice Chen"     },
-        { id: "bob",     label: "Bob Martinez"   },
-        { id: "eve",     label: "Eve Larsson"    }
-      ],
+      // Field-level async callback: simulates fetching the user pool for web hosts.
+      options: async (item) => {
+        await new Promise(r => setTimeout(r, 350)); // simulate API latency
+        const webUsers = [
+          { id: "alice", label: "Alice Chen"   },
+          { id: "bob",   label: "Bob Martinez" },
+          { id: "eve",   label: "Eve Larsson"  }
+        ];
+        return webUsers;
+      },
       items: [
-        { id: "web-01", label: "web-01.prod" },  // uses field-level options
-        { id: "web-02", label: "web-02.prod" },  // uses field-level options
+        { id: "web-01", label: "web-01.prod" },  // uses field-level callback
+        { id: "web-02", label: "web-02.prod" },  // uses field-level callback
         {
           id: "db-01", label: "db-01.prod",
-          options: [                             // DB servers: different user pool
-            { id: "carol",  label: "Carol Kim"   },
-            { id: "david",  label: "David Osei"  }
-          ]
+          // Item-level async callback: DB hosts fetch a different user pool.
+          options: async (item) => {
+            await new Promise(r => setTimeout(r, 350));
+            return [
+              { id: "carol", label: "Carol Kim"  },
+              { id: "david", label: "David Osei" }
+            ];
+          }
         },
         {
           id: "db-02", label: "db-02.prod",
-          options: [
-            { id: "carol",  label: "Carol Kim"   },
-            { id: "david",  label: "David Osei"  }
-          ]
+          options: async (item) => {
+            await new Promise(r => setTimeout(r, 350));
+            return [
+              { id: "carol", label: "Carol Kim"  },
+              { id: "david", label: "David Osei" }
+            ];
+          }
         }
       ],
       checked: {
